@@ -1,0 +1,97 @@
+{*
+ * Project name:
+     I2C_Advanced (Advanced I2C Example)
+ * Copyright:
+     (c) Mikroelektronika, 2011.
+ * Revision History:
+     20110929:
+       - initial release (FJ);
+ * Description:
+     This example features the advanced communication with the 24AA01 EEPROM chip
+     by introducing its own library of functions for this task: init, single
+     write, single and sequential read. It performs write of a sequence of bytes
+     (characters) into the EEPROM and writes this out at the first row on Lcd.
+     Then, data read from EEPROM is performed and the result is displayed at the
+     second row on Lcd.
+ * Test configuration:
+     MCU:             PIC18F45K22
+                      http://ww1.microchip.com/downloads/en/DeviceDoc/41412D.pdf
+     Dev.Board:       EasyPIC7 -  ac:Serial_EEPROM
+                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+     Oscillator:      HS-PLL 32.0000 MHz, 8.0000 MHz Crystal
+     Ext. Modules:    Character Lcd 2x16
+                      http://www.mikroe.com/eng/products/view/277/various-components/
+     SW:              mikroPascal PRO for PIC
+                      http://www.mikroe.com/eng/products/view/10/mikropascal-pro-for-pic/
+ * NOTES:
+     - Turn on I2C switches SW4.7 and SW4.8. (board specific)
+     - Turn off PORTC LEDs (SW3.3). (board specific)
+     - Turn on LCD backlight switch SW4.6. (board specific)
+*}
+
+program I2C_Advanced;
+
+uses EEPROM_24C02;
+
+// Lcd module connections
+var LCD_RS : sbit at LATB4_bit;
+    LCD_EN : sbit at LATB5_bit;
+    LCD_D4 : sbit at LATB0_bit;
+    LCD_D5 : sbit at LATB1_bit;
+    LCD_D6 : sbit at LATB2_bit;
+    LCD_D7 : sbit at LATB3_bit;
+
+var LCD_RS_Direction : sbit at TRISB4_bit;
+    LCD_EN_Direction : sbit at TRISB5_bit;
+    LCD_D4_Direction : sbit at TRISB0_bit;
+    LCD_D5_Direction : sbit at TRISB1_bit;
+    LCD_D6_Direction : sbit at TRISB2_bit;
+    LCD_D7_Direction : sbit at TRISB3_bit;
+// End Lcd module connections
+
+var someData : array[10] of char;
+    counter, tmpdata : byte;
+
+//  Main
+begin
+  EEPROM_24C02_Init();                      // performs I2C initialization
+  ANSELB := 0;                              // Configure PORTB pins as digital
+  ANSELC := 0;                              // Configure PORTC pins as digital
+  Lcd_Init();                               // performs Lcd initialization
+  Lcd_Cmd(_LCD_CLEAR);                      // clear Lcd
+  Lcd_Cmd(_LCD_CURSOR_OFF);                 // set cursor off
+  someData := 'I2C mikroE';                 // data to be written
+
+  // Example for single-byte write
+  counter := 0;
+  tmpData := 1;
+  tmpData := someData[counter];
+  while (tmpData <> 0) do
+    begin
+      Inc(counter);
+      EEPROM_24C02_WrSingle(counter, tmpdata);   // writes data, char by char, in the EEPROM
+      Delay_ms(20);
+      LCD_Chr(1, counter, tmpData);              // displays data on the first row of the Lcd
+      tmpData := someData[counter];
+    end;
+  EEPROM_24C02_WrSingle(counter+1, 0);           // writes string termination
+  Delay_ms(20);
+
+  // Example for single-byte read
+  counter := 1;
+  tmpData := EEPROM_24C02_RdSingle(counter);
+  while (tmpData <> 0) do
+    begin
+      LCD_Chr(2, counter, tmpData);              // displays data from EEPROM on the second row of the Lcd
+      Delay_ms(20);
+      Inc(counter);
+      tmpData := EEPROM_24C02_RdSingle(counter);
+    end;
+
+  // Example for sequential data read
+  //  Delay_ms(1000);
+  //  Lcd_Cmd(_LCD_CLEAR);
+  //  EEPROM_24C02_RdSeq(1, someData, 10);
+  //  Lcd_Out(2,1,someData);
+
+end.

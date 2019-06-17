@@ -1,0 +1,61 @@
+//EEPROM 24C02 read/write library
+unit EEPROM_24C02;
+
+procedure EEPROM_24C02_Init();
+procedure EEPROM_24C02_WrSingle(wAddr: byte; wData : byte);
+function  EEPROM_24C02_RdSingle(rAddr: byte) : byte;
+procedure EEPROM_24C02_RdSeq(rAddr: byte; var rdData : array[16] of byte; rLen : byte);
+
+implementation
+
+//--------------- Performs 24C02 Init
+procedure EEPROM_24C02_Init();
+begin
+  I2C1_Init(100000);
+end;
+
+//--------------- Writes data to 24C02 EEPROM - signle location
+procedure EEPROM_24C02_WrSingle(wAddr: byte; wData : byte);
+begin
+    I2C1_Start();              // issue I2C1 start signal
+    I2C1_Wr(0xA2);             // send byte via I2C1  (command to 24cO2)
+    I2C1_Wr(wAddr);            // send byte (address of EEPROM location)
+    I2C1_Wr(wData);            // send data (data to be written)
+    I2C1_Stop();
+end;
+
+//--------------- Reads data from 24C02 EEPROM - single location (random)
+function EEPROM_24C02_RdSingle(rAddr: byte) : byte;
+var rslt : byte;
+begin
+    I2C1_Start();              // issue I2C1 start signal
+    I2C1_Wr(0xA2);             // send byte via I2C1  (device address + W)
+    I2C1_Wr(rAddr);            // send byte (data address)
+    I2C1_Start();                 // issue I2C1 signal repeated start
+    I2C1_Wr(0xA3);             // send byte (device address + R)
+    rslt := I2C1_Rd(0);       // Read the data (NO acknowledge)
+    while (I2C1_Is_Idle() = 0) do nop;           // Wait for the read cycle to finish
+    I2C1_Stop();
+    result:= rslt;
+end;
+
+//--------------- Reads data from 24C02 EEPROM - sequential read
+procedure EEPROM_24C02_RdSeq(rAddr: byte; var rdData : array[16] of byte; rLen : byte);
+var counter : byte;
+  begin
+    I2C1_Start();                // issue I2C1 start signal
+    I2C1_Wr(0xA2);               // send byte via I2C1  (device address + W)
+    I2C1_Wr(rAddr);              // send byte (address of EEPROM location)
+    I2C1_Start();       // issue I2C1 signal repeated start
+    I2C1_Wr(0xA3);               // send byte (device address + R)
+    counter := 0;
+    while (counter < rLen) do
+      begin
+        rdData[counter] := I2C1_Rd(1);   // read data (YES acknowledge)
+        Delay_ms(20);
+        Inc(counter);
+      end;
+    rdData[counter] := I2C1_Rd(0);     // last data is red WITH ack
+    I2C1_Stop();
+  end;
+end.

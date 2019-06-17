@@ -1,0 +1,67 @@
+' *
+' * Project name:
+'     LED_Curtain (Simple 'Hello World' project)
+' * Copyright:
+'     (c) Mikroelektronika, 2011.
+' * Revision History:
+'     20110929:
+'       - initial release (FJ);
+' * Description:
+'     This is a simple 'Hello World' project. It turns on/off LEDs connected to
+'     PORTA, PORTB, PORTC, PORTD and PORTE.
+' * Test configuration:
+'     MCU:             PIC18F45K22
+'                      http://ww1.microchip.com/downloads/en/DeviceDoc/41412D.pdf
+'     Dev.Board:       EasyPIC7 - ac:LEDs
+'                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+'     Oscillator:      HS-PLL 32.0000 MHz, 8.0000 MHz Crystal
+'     Ext. Modules:    None.
+'     SW:              mikroBasic PRO for PIC
+'                      http://www.mikroe.com/eng/products/view/9/mikrobasic-pro-for-pic/
+' * NOTES:
+'     - Turn ON the PORT LEDs at SW3.
+' *
+
+program LED_Curtain
+
+dim counter as byte
+
+sub procedure Wait()
+  Delay_ms(100)
+end sub
+
+main:
+  TRISA = 0x00        ' Set PORTA direction to be output
+  TRISB = 0x00        ' Set PORTB direction to be output
+  TRISC = 0x00        ' Set PORTC direction to be output
+  TRISD = 0x00        ' Set PORTD direction to be output
+  TRISE = 0x00        ' Set PORTE direction to be output
+
+  LATA = 0x00         ' Turn OFF the LATA leds
+  LATB = 0x00         ' Turn OFF the LATB leds
+  LATC = 0x00         ' Turn OFF the LATC leds
+  LATD = 0x00         ' Turn OFF the LATD leds
+  LATE = 0x00         ' Turn OFF the LATE leds
+
+  while TRUE
+    for counter = 0 to 7
+      LATA = LATA or 1 << counter
+      LATB = LATB or 1 << counter
+      LATC = LATC or 1 << counter
+      LATD = LATD or 1 << counter
+      LATE = LATE or 1 << counter
+      Wait()
+    next counter
+
+    counter = 0
+    while (counter < 8)
+      LATA = LATA and not(1 << counter)
+      LATB = LATB and not(1 << counter)
+      LATC = LATC and not(1 << counter)
+      LATD = LATD and not(1 << counter)
+      LATE = LATE and not(1 << counter)
+      wait()
+      Inc(counter)
+    wend
+  wend
+end.

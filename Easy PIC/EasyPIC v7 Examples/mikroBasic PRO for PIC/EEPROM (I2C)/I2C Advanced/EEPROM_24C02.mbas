@@ -1,0 +1,60 @@
+'EEPROM 24C02 read/write library
+module EEPROM_24C02
+
+sub procedure EEPROM_24C02_Init()
+sub procedure EEPROM_24C02_WrSingle(dim wAddr as byte, dim wData as byte)
+sub function  EEPROM_24C02_RdSingle(dim rAddr as byte) as byte
+sub procedure EEPROM_24C02_RdSeq   (dim rAddr as byte, dim byref rdData as byte[16], dim rLen as byte)
+
+implements
+
+'--------------- Performs 24C02 Init
+sub procedure EEPROM_24C02_Init()
+  I2C1_Init(100000)
+end sub
+
+'--------------- Writes data to 24C02 EEPROM - signle location
+sub procedure EEPROM_24C02_WrSingle(dim wAddr as byte, dim wData as byte)
+  I2C1_Start()                 ' issue TWI start signal
+  I2C1_Wr($A2)                 ' send byte via TWI  (command to 24cO2)
+  I2C1_Wr(wAddr)               ' send byte (address of EEPROM location)
+  I2C1_Wr(wData)               ' send data (data to be written)
+  I2C1_Stop()
+end sub
+
+'--------------- Reads data from 24C02 EEPROM - single location (random)
+sub function  EEPROM_24C02_RdSingle(dim rAddr as byte) as byte
+dim rslt as byte
+
+    I2C1_Start()               ' issue TWI start signal
+    I2C1_Wr($A2)               ' send byte via TWI  (device address + W)
+    I2C1_Wr(rAddr)             ' send byte (data address)
+    I2C1_Start()               ' issue TWI signal repeated start
+    I2C1_Wr(0xA3)              ' send byte (device address + R)
+    rslt = I2C1_Rd(0)          ' Read the data (NO acknowledge)
+    while (I2C1_Is_Idle() = 0)
+      nop                      ' Wait for the read cycle to finish
+    wend
+    I2C1_Stop()
+    result= rslt
+end sub
+
+'--------------- Reads data from 24C02 EEPROM - sequential read
+sub procedure EEPROM_24C02_RdSeq   (dim rAddr as byte, dim byref rdData as byte[16], dim rLen as byte)
+dim counter as byte
+  
+    I2C1_Start()               ' issue TWI start signal
+    I2C1_Wr(0xA2)              ' send byte via TWI  (device address + W)
+    I2C1_Wr(rAddr)             ' send byte (address of EEPROM location)
+    I2C1_Start()               ' issue TWI signal repeated start
+    I2C1_Wr(0xA3)              ' send byte (device address + R)
+    counter = 0
+    while (counter < rLen)
+      rdData[counter] = I2C1_Rd(1)   ' read data (YES acknowledge)
+      Delay_ms(20)
+      Inc(counter)
+    wend
+    rdData[counter] = I2C1_Rd(0)     ' last data is read WITH ack
+    I2C1_Stop()
+end sub
+end.

@@ -1,0 +1,156 @@
+' *
+' * Project name:
+'     TouchPanelCalibration (Demo for working with TouchPanel Controller)
+' * Copyright:
+'     (c) Mikroelektronika, 2011.
+' * Revision History:
+'     20110929:
+'       - initial release (FJ);
+' * Description:
+'     This code works with TouchPanel and GLCD. Two digital output and
+'     two analog input signals are used for communication with TouchPanel.
+'     The example shows how to calibrate touch panel and prints aquired
+'     calibration constants on GLCD.
+' * Test configuration:
+'     MCU:             PIC18F45K22
+'                      http://ww1.microchip.com/downloads/en/DeviceDoc/41412D.pdf
+'     Dev.Board:       EasyPIC7 - ac:Touch_Panel
+'                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+'     Oscillator:      HS-PLL 32.0000 MHz, 8.0000 MHz Crystal
+'     Ext. Modules:    GLCD 128x64, Touch Panel
+'                      http://www.mikroe.com/eng/products/view/277/various-components/
+'     SW:              mikroBasic PRO for PIC
+'                      http://www.mikroe.com/eng/products/view/9/mikrobasic-pro-for-pic/
+' * Notes:
+'     - Turn on GLCD backlight switch SW4.6. (board specific)
+'     - Turn on TouchPanel Controller switches SW3.5, SW3.6, SW3.7 and SW3.8. (board specific)
+'     - Turn off PORTA LEDs SW3.1. (board specific)
+'     - Put the power supply jumper J5 in the 3.3V position. (board specific)
+' *
+
+program TouchPanelCalibration
+
+' Glcd module connections
+dim GLCD_DataPort as byte at PORTD
+
+dim GLCD_CS1 as sbit at LATB0_bit
+    GLCD_CS2 as sbit at LATB1_bit
+    GLCD_RS  as sbit at LATB2_bit
+    GLCD_RW  as sbit at LATB3_bit
+    GLCD_EN  as sbit at LATB4_bit
+    GLCD_RST as sbit at LATB5_bit
+
+dim GLCD_CS1_Direction as sbit at TRISB0_bit
+    GLCD_CS2_Direction as sbit at TRISB1_bit
+    GLCD_RS_Direction  as sbit at TRISB2_bit
+    GLCD_RW_Direction  as sbit at TRISB3_bit
+    GLCD_EN_Direction  as sbit at TRISB4_bit
+    GLCD_RST_Direction as sbit at TRISB5_bit
+' End Glcd module connections
+
+' Touch Panel module connections
+dim DriveA as sbit at LATC0_bit
+    DriveB as sbit at LATC1_bit
+    DriveA_Direction as sbit at TRISC0_bit
+    DriveB_Direction as sbit at TRISC1_bit
+' end Touch Panel module connections
+
+const msg1 = "TOUCH BOTTOM LEFT"
+const msg2 = "                 "
+const msg3 = "TOUCH UPPER RIGHT"
+const msg4 = "CALIBRATION"
+const msg5 = "Calibration constants"
+dim msg as char[21]
+
+dim x_min, y_min, x_max, y_max as word                    ' Calibration constants
+
+dim x_min_msg as char[6]                                  ' GLCD messages
+dim y_min_msg as char[6]
+dim x_max_msg as char[6]
+dim y_max_msg as char[6]
+
+dim x_min_val as char[5]                                  ' Calibration constants string values
+dim y_min_val as char[5]
+dim x_max_val as char[5]
+dim y_max_val as char[5]
+
+' copy const to ram string
+sub function CopyConst2Ram(dim const src as ^byte) as  string[21]
+dim i as byte
+i = 0
+  while src^ <> 0
+
+      result[i] = src^
+      inc(src)
+      inc(i)
+   wend
+   result[i] = 0
+end sub
+
+sub procedure Initialize()
+  ANSELA = 3             ' Configure AN0 and AN1 pins as analog
+  ANSELB = 0             ' Configure PORTB pins as digital
+  ANSELC = 0             ' Configure PORTC pins as digital
+  ANSELD = 0             ' Configure PORTD pins as digital
+  TRISA  = 3             ' Configure AN0 and AN1 pins as input
+
+  Glcd_Init()                 ' Initialize GLCD
+  Glcd_Fill(0)                ' Clear GLCD
+  ADC_Init()                  ' Initialize ADC
+  TP_Init(128, 64, 0, 1)      ' Initialize touch panel
+  TP_Set_ADC_Threshold(900)   ' Set touch panel ADC threshold
+end sub
+
+sub procedure Calibrate()
+  Glcd_Dot(0,63,1)                                       ' Draw bottom left dot
+  msg = CopyConst2Ram(@msg1)
+  Glcd_Write_Text(msg,12,3,1)
+  TP_Calibrate_Bottom_Left()                             ' Calibration of bottom left corner
+  Delay_ms(1000)
+
+  Glcd_Dot(0,63,0)                                       ' Clear bottom left dot
+  Glcd_Dot(127,0,1)                                      ' Draw upper right dot
+  msg = CopyConst2Ram(@msg2)
+  Glcd_Write_Text(msg,12,3,1)
+  msg = CopyConst2Ram(@msg3)
+  Glcd_Write_Text(msg,12,4,1)
+  TP_Calibrate_Upper_Right()                             ' Calibration of upper right corner
+  Delay_ms(1000)
+end sub
+
+main:
+  Initialize()
+
+  x_min_msg = "X min:"
+  y_min_msg = "Y min:"
+  x_max_msg = "X max:"
+  y_max_msg = "Y max:"
+  
+  msg = CopyConst2Ram(@msg4)
+  Glcd_Write_Text(msg,32,3,1)
+  Delay_ms(1000)
+  Glcd_Fill(0)                                              ' Clear GLCD
+  Calibrate()
+
+  TP_Get_Calibration_Consts(@x_min, @x_max, @y_min, @y_max) ' Get calibration constants
+
+  WordToStr(x_min, x_min_val)                               ' Convert calibration constants into string values
+  WordToStr(x_max, x_max_val)
+  WordToStr(y_min, y_min_val)
+  WordToStr(y_max, y_max_val)
+
+  ' Display Calibration constants on GLCD
+
+  Glcd_Fill(0)                                            ' Clear GLCD
+  msg = CopyConst2Ram(@msg5)
+  Glcd_Write_Text(msg,1,1,1)
+  Glcd_Write_Text(x_min_msg,1,3,1)                        ' Write messages on GLCD
+  Glcd_Write_Text(x_max_msg,1,4,1)
+  Glcd_Write_Text(y_min_msg,1,5,1)
+  Glcd_Write_Text(y_max_msg,1,6,1)
+
+  Glcd_Write_Text(x_min_val,50,3,1)                       ' Write calibration constants values on GLCD
+  Glcd_Write_Text(x_max_val,50,4,1)
+  Glcd_Write_Text(y_min_val,50,5,1)
+  Glcd_Write_Text(y_max_val,50,6,1)
+end.

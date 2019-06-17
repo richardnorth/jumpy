@@ -1,0 +1,134 @@
+' *
+' * Project name:
+'     OneWire (Interfacing the DS1820 temperature sensor - all versions)
+' * Copyright:
+'     (c) Mikroelektronika, 2011.
+' * Revision History:
+'     20110929:
+'       - initial release (FJ);
+' * Description:
+'     This code demonstrates one-wire communication with temperature sensor
+'     DS18x20 connected to RA4 or RE2 pin.
+'     MCU reads temperature from the sensor and prints it on the LCD.
+'     The display format of the temperature is 'xxx.xxxx°C'. To obtain correct
+'     results, the 18x20's temperature resolution has to be adjusted (constant
+'     TEMP_RESOLUTION).
+' * Test configuration:
+'     MCU:             PIC18F45K22
+'                      http://ww1.microchip.com/downloads/en/DeviceDoc/41412D.pdf
+'     Dev.Board:       EasyPIC7 - ac:One_Wire
+'                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+'     Oscillator:      HS-PLL 32.0000 MHz, 8.0000 MHz Crystal
+'     Ext. Modules:    DS18x20 Sensor, Character Lcd 2x16
+'                      http://www.mikroe.com/eng/products/view/277/various-components/
+'     SW:              mikroBasic PRO for PIC
+'                      http://www.mikroe.com/eng/products/view/9/mikrobasic-pro-for-pic/
+' * NOTES:
+'     - Place LM35 in proper position and place jumper J11 in the right position (RE2). (board specific)
+'     - Turn on Lcd backlight switch SW4.6. (board specific)
+'     - Be sure to put the power supply jumper J5 in the 5V position.
+' *
+
+program OneWire
+
+' Lcd module connections
+dim LCD_RS as sbit at LATB4_bit
+    LCD_EN as sbit at LATB5_bit
+    LCD_D4 as sbit at LATB0_bit
+    LCD_D5 as sbit at LATB1_bit
+    LCD_D6 as sbit at LATB2_bit
+    LCD_D7 as sbit at LATB3_bit
+
+dim LCD_RS_Direction as sbit at TRISB4_bit
+    LCD_EN_Direction as sbit at TRISB5_bit
+    LCD_D4_Direction as sbit at TRISB0_bit
+    LCD_D5_Direction as sbit at TRISB1_bit
+    LCD_D6_Direction as sbit at TRISB2_bit
+    LCD_D7_Direction as sbit at TRISB3_bit
+' End Lcd module connections
+
+'  Set TEMP_RESOLUTION to the corresponding resolution of used DS18x20 sensor:
+'  18S20: 9  (default setting can be 9,10,11,or 12)
+'  18B20: 12
+const TEMP_RESOLUTION as byte = 9
+
+dim text as char[9]
+    temp as word
+
+sub procedure Display_Temperature( dim temp2write as word )
+const RES_SHIFT = TEMP_RESOLUTION - 8
+
+dim temp_whole as byte
+    temp_fraction as word
+
+    text = "000.0000"
+    ' Check if temperature is negative
+    if (temp2write and 0x8000) then
+      text[0] = "-"
+      temp2write = not temp2write + 1
+    end if
+
+    ' Extract temp_whole
+    temp_whole = word(temp2write >> RES_SHIFT)
+
+    ' Convert temp_whole to characters
+    if ( temp_whole div 100 ) then
+      text[0] = temp_whole div 100  + 48
+    else
+      text[0] = "0"
+    end if
+
+    text[1] = (temp_whole div 10)mod 10 + 48               ' Extract tens digit
+    text[2] =  temp_whole mod 10        + 48               ' Extract ones digit
+
+    ' Extract temp_fraction and convert it to unsigned int
+    temp_fraction  =  word(temp2write << (4-RES_SHIFT))
+    temp_fraction  = temp_fraction and 0x000F
+    temp_fraction  = temp_fraction * 625
+
+    ' Convert temp_fraction to characters
+    text[4] = word(temp_fraction div 1000)    + 48         ' Extract thousands digit
+    text[5] = word((temp_fraction div 100)mod 10 + 48)     ' Extract hundreds digit
+    text[6] = word((temp_fraction div 10)mod 10  + 48)     ' Extract tens digit
+    text[7] = word(temp_fraction mod 10)      + 48         ' Extract ones digit
+
+    ' Print temperature on Lcd
+    Lcd_Out(2, 5, text)
+end sub
+
+main:
+  ANSELE = 0                             ' Configure PORTE pins as digital
+  TRISE.B2 = 1                           ' Configure RE2 pin as input
+
+  text = "000.0000"  
+  Lcd_Init()                             ' Initialize Lcd
+
+  Lcd_Cmd(_LCD_CLEAR)                    ' Clear Lcd
+  Lcd_Cmd(_LCD_CURSOR_OFF)               ' Turn cursor off
+  Lcd_Out(1, 1, " Temperature:   ")
+
+  Lcd_Chr(2,13,223)                      ' Print degree character, "C" for Centigrades
+                                         ' Different Lcd displays have different char code for degree
+  Lcd_Chr(2,14,"C")                      ' If you see greek alpha letter try typing 178 instead of 223
+
+  ' Main loop
+  while (TRUE)
+    ' Perform temperature reading
+    Ow_Reset(PORTE, 2)                   ' Onewire reset signal
+    Ow_Write(PORTE, 2, 0xCC)             ' Issue command SKIP_ROM
+    Ow_Write(PORTE, 2, 0x44)             ' Issue command CONVERT_T
+    Delay_us(120)
+
+    Ow_Reset(PORTE, 2)
+    Ow_Write(PORTE, 2, 0xCC)             ' Issue command SKIP_ROM
+    Ow_Write(PORTE, 2, 0xBE)             ' Issue command READ_SCRATCHPAD
+
+    temp =  Ow_Read(PORTE, 2)
+    temp = (Ow_Read(PORTE, 2) << 8) + temp
+
+    'Format and display result on Lcd
+    Display_Temperature(temp)
+
+    Delay_ms(520)
+  wend
+end.

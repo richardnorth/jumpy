@@ -1,0 +1,120 @@
+{*
+ * Project name:
+     Sound_Var (Usage of Sound library)
+ * Copyright:
+     (c) Mikroelektronika, 2011.
+ * Revision History:
+     20110929:
+       - initial release (FJ);
+ * Description:
+     This project is a simple demonstration of how to
+     use sound library for playing tones on a piezo speaker.
+ * Test configuration:
+     MCU:             PIC18F45K22
+                      http://ww1.microchip.com/downloads/en/DeviceDoc/41412D.pdf
+     Dev.Board:       EasyPIC7 - ac:Sound
+                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+     Oscillator:      HS-PLL 32.0000 MHz, 8.0000 MHz Crystal
+     Ext. Modules:    None.
+     SW:              mikroPascal PRO for PIC
+                      http://www.mikroe.com/eng/products/view/10/mikropascal-pro-for-pic/
+ * NOTES:
+     - Put Piezo Buzzer jumper J21 into upper position (RE1). (board specific)
+     - Put button jumper (J17) into VCC position and
+       pull-down pins RB7...RB3 on PORTB. (board specific)
+*}
+
+program Sound;
+
+procedure Tone1();
+  begin
+    Sound_Play(659, 250);            // Frequency = 659Hz, duration = 250ms
+  end;
+
+procedure Tone2();
+  begin
+    Sound_Play(698, 250);            // Frequency = 698Hz, duration = 250ms
+  end;
+
+procedure Tone3();
+  begin
+    Sound_Play(784, 250);            // Frequency = 784Hz, duration = 250ms
+  end;
+
+procedure Melody();                  // Plays the melody "Yellow house"
+  begin
+    Tone1(); Tone2(); Tone3(); Tone3();
+    Tone1(); Tone2(); Tone3(); Tone3();
+    Tone1(); Tone2(); Tone3();
+    Tone1(); Tone2(); Tone3(); Tone3();
+    Tone1(); Tone2(); Tone3();
+    Tone3(); Tone3(); Tone2(); Tone2(); Tone1();
+  end;
+
+procedure ToneA();                   // Tones used in Melody2 function
+  begin
+    Sound_Play( 880, 50);
+  end;
+
+procedure ToneC();
+  begin
+    Sound_Play(1046, 50);
+  end;
+
+procedure ToneE();
+  begin
+    Sound_Play(1318, 50);
+  end;
+
+procedure Melody2();                 // Plays Melody2
+var counter : byte;
+  begin
+    for counter := 9 downto 1 do
+      begin
+        ToneA();
+        ToneC();
+        ToneE();
+      end;
+  end;
+
+begin
+  ANSELB := 0;                       // Configure PORTB pins as digital
+  ANSELE := 0;                       // Configure PORTE pins as digital
+  TRISB := 0xF8;                     // Configure RB7..RB3 as input
+
+  Sound_Init(PORTE, 1);
+  Sound_Play(880, 1000);             // Play sound at 880Hz for 1 second
+
+  while TRUE do                          // endless loop
+    begin
+      if (Button(PORTB,7,1,1)) then      // If PORTB.7 is pressed play Tone3
+        begin
+          Tone1();
+          while (RB7_bit <> 0) do nop;   // Wait for button to be released
+        end;
+
+      if (Button(PORTB,6,1,1)) then      // If PORTB.6 is pressed play Tone2
+        begin
+          Tone2();
+          while (RB6_bit <> 0) do nop;   // Wait for button to be released
+        end;
+
+      if (Button(PORTB,5,1,1)) then      // If PORTB.5 is pressed play Tone1
+        begin
+          Tone3();
+          while (RB5_bit <> 0) do nop;   // Wait for button to be released
+        end;
+
+      if (Button(PORTB,4,1,1)) then      // If PORTB.4 is pressed play Melody2
+        begin
+          Melody2();
+          while (RB4_bit <> 0) do nop;   // Wait for button to be released
+        end;
+
+      if (Button(PORTB,3,1,1)) then      // If PORTB.3 is pressed play Melody
+          begin
+            Melody();
+            while (RB3_bit <> 0) do nop; // Wait for button to be released
+          end;
+    end;
+end.

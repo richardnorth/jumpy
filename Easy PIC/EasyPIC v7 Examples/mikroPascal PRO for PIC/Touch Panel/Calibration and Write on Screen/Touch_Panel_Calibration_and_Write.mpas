@@ -1,0 +1,202 @@
+{*
+ * Project name:
+     TouchPanelCalibrationAndWrite (Demo for working with TouchPanel Controller)
+ * Copyright:
+     (c) Mikroelektronika, 2011.
+ * Revision History:
+     20110929:
+       - initial release (FJ);
+ * Description:
+     This code works with TouchPanel and GLCD. Two digital output and
+     two analog input signals are used for communication with TouchPanel.
+     This example shows how to calibrate touch panel and how to write on the screen.
+ * Test configuration:
+     MCU:             PIC18F45K22
+                      http://ww1.microchip.com/downloads/en/DeviceDoc/41412D.pdf
+     Dev.Board:       EasyPIC7 - ac:Touch_Panel
+                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+     Oscillator:      HS-PLL 32.0000 MHz, 8.0000 MHz Crystal
+     Ext. Modules:    GLCD 128x64, Touch Panel
+                      http://www.mikroe.com/eng/products/view/277/various-components/
+     SW:              mikroPascal PRO for PIC
+                      http://www.mikroe.com/eng/products/view/10/mikropascal-pro-for-pic/
+ * Notes:
+     - Turn on GLCD backlight switch SW4.6. (board specific)
+     - Turn on TouchPanel Controller switches SW3.5, SW3.6, SW3.7 and SW3.8. (board specific)
+     - Turn off PORTA LEDs SW3.1. (board specific)
+     - Put the power supply jumper J5 in the 3.3V position. (board specific)
+ *}
+
+program TouchPanelCalibrationAndWrite;
+
+// Glcd module connections
+var GLCD_DataPort : byte at PORTD;
+
+var GLCD_CS1 : sbit at LATB0_bit;
+    GLCD_CS2 : sbit at LATB1_bit;
+    GLCD_RS  : sbit at LATB2_bit;
+    GLCD_RW  : sbit at LATB3_bit;
+    GLCD_EN  : sbit at LATB4_bit;
+    GLCD_RST : sbit at LATB5_bit;
+
+var GLCD_CS1_Direction : sbit at TRISB0_bit;
+    GLCD_CS2_Direction : sbit at TRISB1_bit;
+    GLCD_RS_Direction  : sbit at TRISB2_bit;
+    GLCD_RW_Direction  : sbit at TRISB3_bit;
+    GLCD_EN_Direction  : sbit at TRISB4_bit;
+    GLCD_RST_Direction : sbit at TRISB5_bit;
+// End Glcd module connections
+
+
+// Touch Panel module connections
+var DriveA : sbit at LATC0_bit;
+    DriveB : sbit at LATC1_bit;
+    DriveA_Direction : sbit at TRISC0_bit;
+    DriveB_Direction : sbit at TRISC1_bit;
+// end Touch Panel module connections
+
+var write_erase : bit;
+    pen_size : byte;
+    x_coord, y_coord : word;
+    write_msg, clear_msg, erase_msg : array[5] of char;      // GLCD menu messages
+
+procedure Initialize();
+  begin
+    ANSELA := 3;             // Configure AN0 and AN1 pins as analog
+    ANSELB := 0;             // Configure PORTB pins as digital
+    ANSELC := 0;             // Configure PORTC pins as digital
+    ANSELD := 0;             // Configure PORTD pins as digital
+    TRISA  := 3;             // Configure AN0 and AN1 pins as input
+
+    Glcd_Init();                                             // Initialize GLCD
+    Glcd_Fill(0);                                            // Clear GLCD
+
+    ADC_Init();                                              // Initialize ADC
+    TP_Init(128, 64, 0, 1);                                  // Initialize touch panel
+    TP_Set_ADC_Threshold(900);                               // Set touch panel ADC threshold
+  end;
+
+procedure Calibrate();
+  begin
+    Glcd_Dot(0,63,1);                                        // Draw bottom left dot
+    Glcd_Write_Text('TOUCH BOTTOM LEFT',12,3,1);
+    TP_Calibrate_Bottom_Left();                              // Calibration of bottom left corner
+    Delay_ms(1000);
+
+    Glcd_Dot(0,63,0);                                        // Clear bottom left dot
+    Glcd_Dot(127,0,1);                                       // Draw upper right dot
+    Glcd_Write_Text('                 ',12,3,1);
+    Glcd_Write_Text('TOUCH UPPER RIGHT',12,4,1);
+    TP_Calibrate_Upper_Right();                              // Calibration of upper right corner
+    Delay_ms(1000);
+  end;
+
+begin
+  write_msg := 'WRITE';
+  clear_msg := 'CLEAR';
+  erase_msg := 'ERASE';
+
+  Initialize();
+
+  Glcd_Fill(0);                                            // Clear GLCD
+  Glcd_Write_Text('CALIBRATION',32,3,1);
+  Delay_ms(1000);
+  Glcd_Fill(0);                                            // Clear GLCD
+  Calibrate();
+  Glcd_Fill(0);
+
+  Glcd_Write_Text('WRITE ON SCREEN', 20, 5, 1) ;
+  Delay_ms(1000);
+  Glcd_Fill(0);
+
+  Glcd_V_Line(0,7,0,1);
+  Glcd_Write_Text(clear_msg,1,0,0);
+  Glcd_V_Line(0,7,97,1);
+  Glcd_Write_Text(erase_msg,98,0,0);
+
+  // Pen Menu:
+  Glcd_Rectangle(41,0,52,9,1);
+  Glcd_Box(45,3,48,6,1);
+  Glcd_Rectangle(63,0,70,7,1);
+  Glcd_Box(66,3,67,4,1);
+  Glcd_Rectangle(80,0,86,6,1);
+  Glcd_Dot(83,3,1);
+
+  write_erase := 1;
+  pen_size := 1;
+
+  while (TRUE) do
+    begin
+
+      if (TP_Press_Detect() <> 0) then
+        begin
+          // After a PRESS is detected read X-Y and convert it to 128x64 space
+          if (TP_Get_Coordinates(@x_coord, @y_coord) = 0) then
+            begin
+              if ((x_coord < 31) and (y_coord < 8)) then
+                begin
+                  Glcd_Fill(0);
+
+                  // Pen Menu:
+                  Glcd_Rectangle(41,0,52,9,1);
+                  Glcd_Box(45,3,48,6,1);
+                  Glcd_Rectangle(63,0,70,7,1);
+                  Glcd_Box(66,3,67,4,1);
+                  Glcd_Rectangle(80,0,86,6,1);
+                  Glcd_Dot(83,3,1);
+
+                  Glcd_V_Line(0,7,0,1);
+                  Glcd_Write_Text(clear_msg,1,0,0);
+                  Glcd_V_Line(0,7,97,1);
+                  if (write_erase) then
+                    Glcd_Write_Text(erase_msg,98,0,0)
+                  else
+                    Glcd_Write_Text(write_msg,98,0,0);
+                end;
+
+              // If write/erase is pressed
+              if ((x_coord > 96) and (y_coord < 8)) then
+                begin
+                  if (write_erase) then
+                    begin
+                      write_erase := 0;
+                      Glcd_Write_Text(write_msg,98,0,0);
+                      Delay_ms(500);
+                    end
+                  else
+                    begin
+                      write_erase := 1;
+                      Glcd_Write_Text(erase_msg,98,0,0);
+                      Delay_ms(500);
+                    end;
+                end;
+
+              // If pen size is selected
+              if ((x_coord >= 41) and (x_coord <= 52) and (y_coord <= 9)) then
+                pen_size := 3;
+
+              if ((x_coord >= 63) and (x_coord <= 70) and (y_coord <= 7)) then
+                pen_size := 2;
+
+              if ((x_coord >= 80) and (x_coord <= 86) and (y_coord <= 6)) then
+                pen_size := 1;
+
+              if (y_coord < 11) then
+                continue;
+
+              case pen_size of
+                1: if ( (x_coord >= 0) and (y_coord >= 0) and (x_coord <= 127) and (y_coord <= 63) ) then
+                     Glcd_Dot(x_coord, y_coord, write_erase);
+
+                2: if ( (x_coord >= 0) and (y_coord >= 0) and (x_coord <= 127-1) and (y_coord <= 63-1) ) then
+                     Glcd_Box(x_coord, y_coord, x_coord + 1, y_coord + 1, write_erase);
+
+
+                3: if ( (x_coord >= 1) and (y_coord >= 1) and (x_coord <= 127-2) and (y_coord <= 63-2) ) then
+                     Glcd_Box(x_coord-1, y_coord-1, x_coord + 2, y_coord + 2, write_erase);
+
+              end;
+            end;
+        end;
+    end;
+end.

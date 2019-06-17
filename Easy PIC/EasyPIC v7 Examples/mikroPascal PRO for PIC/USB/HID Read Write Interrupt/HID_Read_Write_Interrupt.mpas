@@ -1,0 +1,57 @@
+{*
+ * Project name:
+     HID_Read_Write_Interrupt (Testing the USB HID connection)
+ * Copyright:
+     (c) Mikroelektronika, 2011.
+ * Revision History:
+     20110929:
+       - initial release (FJ);
+ * Description:
+     This example establishes connection with the HID terminal that is active
+     on the PC. Upon connection establishment, the HID Device Name will appear
+     in the respective window. After that software will wait for data and
+     it will return received data back.
+ * Test configuration:
+     MCU:             PIC18F4550
+                      http://ww1.microchip.com/downloads/en/DeviceDoc/39632D.pdf
+     Dev.Board:       EasyPIC7 - ac:USB
+                      http://www.mikroe.com/eng/products/view/757/easypic-v7-development-system/
+     Oscillator:      HS, 8.000 MHz  (USB osc. is raised with PLL to 48.000MHz)
+     Ext. Modules:    None.
+     SW:              mikroPascal PRO for PIC
+                      http://www.mikroe.com/eng/products/view/10/mikropascal-pro-for-pic/
+ * NOTES:
+     (*) Be VERY careful about the configuration flags for the 18F4550 - there's
+     so much place for mistake!
+    - Place jumpers J12 in the right (USB) position.
+ *}
+
+program HID_Read_Write_Interrupt;
+
+var cnt : byte;
+
+var readbuff : array[64] of byte; absolute 0x500;   // Buffers should be in USB RAM, please consult datasheet
+var writebuff : array[64] of byte; absolute 0x540;
+
+procedure Interrupt();
+begin
+   USB_Interrupt_Proc();                           // USB servicing is done inside the interrupt
+
+end;
+
+begin
+  ADCON1 := ADCON1 or 0x0F;                       // Configure all ports with analog function as digital
+  CMCON  := CMCON or 7;                           // Disable comparators
+
+  HID_Enable(@readbuff,@writebuff);               // Enable HID communication
+
+  while TRUE do
+    begin
+      while(HID_Read() = 0) do
+        ;
+      for cnt:=0 to 63 do
+        writebuff[cnt] := readbuff[cnt];
+      while(HID_Write(@writebuff,64) = 0) do
+        ;
+    end;
+end.
